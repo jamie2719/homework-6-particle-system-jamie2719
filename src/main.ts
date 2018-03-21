@@ -110,7 +110,7 @@ function loadScene() {
 function raycast(camera: Camera, screenPos: vec2) : vec3 {
   var eye =  camera.position;
   var fov = camera.fovy;
-  var ref = vec3.fromValues(0.0, 0.0, 0.0);
+  var ref = camera.target;
 
   var sx = (screenPos[0]);
   var sy = (screenPos[1]);
@@ -336,12 +336,10 @@ function main() {
       mouse2[0] = mouse2[0] * 2.0 / window.innerWidth - 1.0; //pixel to NDC (screen)
       mouse2[1] = 1.0 - (mouse2[1] * 2.0 / window.innerHeight);
 
-
-      
       //raycast 
       var dir = raycast(camera, mouse2);
       var origin = camera.position;
-      //check if this ray from eye intersects unit plane at origin]
+      //check if this ray from eye intersects unit plane at origin
       var planeNormal = vec3.create();
       planeNormal = vec3.normalize(planeNormal, camera.position);
       var denom = vec3.dot(planeNormal, dir);
