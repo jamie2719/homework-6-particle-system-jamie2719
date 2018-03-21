@@ -28,19 +28,19 @@ let colorsArray: Array<number>;
 let n = 0;
 let currMouse: vec4;
 let currDir: boolean = true;
-let clicked: boolean = true;
-let cow: Mesh;
-let wahoo: Mesh;
+let clicked: boolean = false;
 let cube: Mesh;
 let triangle: Mesh;
+let dodec: Mesh;
 
 function loadScene() {
+  clicked = false;
   square = new Square();
   square.create();
   particles = new Array<Particle>();
   offsetsArray = new Array<number>();
   colorsArray = new Array<number>();
-  currMouse = null;
+  currMouse = vec4.fromValues(0, 0, 0, 1);
 
   const canvas = <HTMLCanvasElement> document.getElementById('canvas');
   var gl = <WebGL2RenderingContext> canvas.getContext('webgl2');
@@ -53,31 +53,12 @@ function loadScene() {
   cube = new Mesh(cubeStr, vec3.fromValues(0, 0, 0));
   cube.create();
 
-  var cowStr = document.getElementById('cow.obj').innerHTML;
-  cow = new Mesh(cowStr, vec3.fromValues(0, 0, 0));
-  cow.create();
-
-  var wahooStr = document.getElementById('wahoo.obj').innerHTML;
-  wahoo = new Mesh(wahooStr, vec3.fromValues(0, 0, 0));
-  wahoo.create();
+  var dodecStr = document.getElementById('dodecahedron.obj').innerHTML;
+  dodec = new Mesh(dodecStr, vec3.fromValues(0, 0, 0));
+  dodec.create();
 
   var scaleMat = mat4.create();
   scaleMat = mat4.fromScaling(scaleMat, vec3.fromValues(10, 10, 10));
-  for(var i = 0; i < cow.positions.length; i += 4) {
-    var currPos = vec4.fromValues(cow.positions[i], cow.positions[i+1], cow.positions[i+2], cow.positions[i+3]);
-    currPos = vec4.transformMat4(currPos, currPos, scaleMat);
-    cow.positions[i] = currPos[0];
-    cow.positions[i+1] = currPos[1];
-    cow.positions[i+2] = currPos[2];
-  }
-
-  for(var i = 0; i < wahoo.positions.length; i += 4) {
-    var currPos = vec4.fromValues(wahoo.positions[i], wahoo.positions[i+1], wahoo.positions[i+2], wahoo.positions[i+3]);
-    currPos = vec4.transformMat4(currPos, currPos, scaleMat);
-    wahoo.positions[i] = currPos[0];
-    wahoo.positions[i+1] = currPos[1];
-    wahoo.positions[i+2] = currPos[2];
-  }
 
   for(var i = 0; i < triangle.positions.length; i += 4) {
     var currPos = vec4.fromValues(triangle.positions[i], triangle.positions[i+1], triangle.positions[i+2], triangle.positions[i+3]);
@@ -87,10 +68,15 @@ function loadScene() {
     triangle.positions[i+2] = currPos[2];
   }
 
+  for(var i = 0; i < dodec.positions.length; i += 4) {
+    var currPos = vec4.fromValues(dodec.positions[i], dodec.positions[i+1], dodec.positions[i+2], dodec.positions[i+3]);
+    currPos = vec4.transformMat4(currPos, currPos, scaleMat);
+    dodec.positions[i] = currPos[0];
+    dodec.positions[i+1] = currPos[1];
+    dodec.positions[i+2] = currPos[2];
+  }
 
-  var wahooStr = document.getElementById('wahoo.obj').innerHTML;
-  wahoo = new Mesh(wahooStr, vec3.fromValues(0, 0, 0));
-  wahoo.create();
+
 
   n= controls.numParticles;
   for(let i = 0; i < n; i++) {
@@ -114,13 +100,11 @@ function loadScene() {
     }
   }
   let offsets: Float32Array = new Float32Array(offsetsArray);
-
   let colors: Float32Array = new Float32Array(colorsArray);
 
 
   square.setInstanceVBOs(offsets, colors);
   square.setNumInstances(n * n); // 10x10 grid of "particles"
-  console.log(square);
 }
 
 function raycast(camera: Camera, screenPos: vec2) : vec3 {
@@ -180,9 +164,9 @@ function main() {
   const gui = new DAT.GUI();
   gui.add(controls, 'numParticles', 0, 30).step(2);
   var forceDir = gui.add(controls, 'forceDirection', [ 'attract', 'repel'] );
-  gui.add(controls, 'Reset');
   gui.add(controls, 'dragScale', 0, 1).step(.1);
-  gui.add(controls, 'meshAttractor', ['None', 'Triangle', 'Cube', 'Cow', 'Wahoo']);
+  gui.add(controls, 'meshAttractor', ['None', 'Triangle', 'Cube', 'Dodecahedron']);
+  gui.add(controls, 'Reset');
   
 
   // get canvas and webgl context
@@ -215,36 +199,28 @@ function main() {
   // This function will be called every frame
   function tick() {
     camera.update();
+    renderer.setClearColor(.02, (Math.sin(time*.01) + 1) / 10.0, (Math.cos(time*.01) + 1) / 4.0, 1);
 
     if(controls.meshAttractor == 'None') {
-    for(var i = 0; i < particles.length; i++) {
- 
-      if(currMouse != null) {
-        if(controls.meshAttractor == 'None') {
-          particles[i].updateAcceleration(vec3.fromValues(currMouse[0], currMouse[1], currMouse[2]), currDir, controls.dragScale); 
-        }
+      if(clicked) {
+        for(var i = 0; i < particles.length; i++) {
+      
+            particles[i].updateAcceleration(vec3.fromValues(currMouse[0], currMouse[1], currMouse[2]), currDir, controls.dragScale); 
+            particles[i].curr_p = particles[i].updatePosition(.1);
+            //update vbo array
+            offsetsArray[3*i] = particles[i].curr_p[0];
+            offsetsArray[3*i+1] = particles[i].curr_p[1];
+            offsetsArray[3*i+2] = particles[i].curr_p[2];
       }
-  
-    // else if(controls.meshAttractor == 'Cube') {
-    //   particles[i].updateAcceleration(vec3.fromValues(cube.positions[i], cube.positions[i+1], cube.positions[i+2]), currDir, controls.dragScale); 
-    //   console.log("Cube");
-    // }
-
-      particles[i].curr_p = particles[i].updatePosition(.1);
-      //update vbo array
-      offsetsArray[3*i] = particles[i].curr_p[0];
-      offsetsArray[3*i+1] = particles[i].curr_p[1];
-      offsetsArray[3*i+2] = particles[i].curr_p[2];
     }
+    
 
-      let offsets: Float32Array = new Float32Array(offsetsArray);
-      let colors: Float32Array = new Float32Array(colorsArray);
-      square.setInstanceVBOs(offsets, colors);
-      square.setNumInstances(n * n); 
-
-
+        let offsets: Float32Array = new Float32Array(offsetsArray);
+        let colors: Float32Array = new Float32Array(colorsArray);
+        square.setInstanceVBOs(offsets, colors);
+        square.setNumInstances(n * n); 
+    
     }
-
 
     else if(controls.meshAttractor == 'Triangle') {
       //for each vertex in mesh
@@ -255,13 +231,10 @@ function main() {
             break;
           }
           //calculate acceleration for curr particle to accelerate towards curr vertex
-          particles[currParticleIndex].updateAccelerationToMesh(vec3.fromValues(triangle.positions[i], triangle.positions[i+1], triangle.positions[i+2]), true, controls.dragScale);
-  
-            currParticleIndex++;
-  
+          particles[currParticleIndex].updateAcceleration(vec3.fromValues(triangle.positions[i], triangle.positions[i+1], triangle.positions[i+2]), true, controls.dragScale);
+          currParticleIndex++;
         }
       }
-  
       for(var i = 0; i < particles.length; i++) {
         particles[i].curr_p = particles[i].updatePosition(.1);
         //update vbo array
@@ -273,7 +246,7 @@ function main() {
         let colors: Float32Array = new Float32Array(colorsArray);
         square.setInstanceVBOs(offsets, colors);
         square.setNumInstances(n * n); 
-      
+        clicked = true;
     }
     
     else if(controls.meshAttractor == 'Cube') {
@@ -285,13 +258,10 @@ function main() {
           break;
         }
         //calculate acceleration for curr particle to accelerate towards curr vertex
-        particles[currParticleIndex].updateAccelerationToMesh(vec3.fromValues(cube.positions[i], cube.positions[i+1], cube.positions[i+2]), true, controls.dragScale);
-
-          currParticleIndex++;
-
+        particles[currParticleIndex].updateAcceleration(vec3.fromValues(cube.positions[i], cube.positions[i+1], cube.positions[i+2]), true, controls.dragScale);
+        currParticleIndex++;
       }
     }
-
     for(var i = 0; i < particles.length; i++) {
       particles[i].curr_p = particles[i].updatePosition(.1);
       //update vbo array
@@ -303,26 +273,23 @@ function main() {
       let colors: Float32Array = new Float32Array(colorsArray);
       square.setInstanceVBOs(offsets, colors);
       square.setNumInstances(n * n); 
-    
+      clicked = true;
   }
 
-  else if(controls.meshAttractor == 'Wahoo') {
+  else if(controls.meshAttractor == 'Dodecahedron') {
     //for each vertex in mesh
     var currParticleIndex = 0; //needs to be 8 for cube
     while(currParticleIndex < particles.length) {
-      for(var i = 0; i < wahoo.positions.length; i+=4) {
+      for(var i = 0; i < dodec.positions.length; i+=4) {
         //console.log(currParticleIndex);
         if(currParticleIndex >= particles.length) {
           break;
         }
         //calculate acceleration for curr particle to accelerate towards curr vertex
-        particles[currParticleIndex].updateAcceleration(vec3.fromValues(wahoo.positions[i], wahoo.positions[i+1], wahoo.positions[i+2]), true, controls.dragScale);
-
+        particles[currParticleIndex].updateAcceleration(vec3.fromValues(dodec.positions[i], dodec.positions[i+1], dodec.positions[i+2]), true, controls.dragScale);
         currParticleIndex++;
-
       }
     }
-
     for(var i = 0; i < particles.length; i++) {
       particles[i].curr_p = particles[i].updatePosition(.1);
       //update vbo array
@@ -334,7 +301,7 @@ function main() {
       let colors: Float32Array = new Float32Array(colorsArray);
       square.setInstanceVBOs(offsets, colors);
       square.setNumInstances(n * n); 
-    
+      clicked = true;
   }
 
 
@@ -369,8 +336,6 @@ function main() {
       mouse2[0] = mouse2[0] * 2.0 / window.innerWidth - 1.0; //pixel to NDC (screen)
       mouse2[1] = 1.0 - (mouse2[1] * 2.0 / window.innerHeight);
 
-      console.log(mouse2[0]);
-      console.log(mouse2[1]);
 
       
       //raycast 
@@ -403,7 +368,6 @@ function main() {
       else {
         currDir = false;
       }
-      clicked = false;
     }
   });
 
