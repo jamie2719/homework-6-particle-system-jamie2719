@@ -13,7 +13,7 @@ class Particle {
         this.a = acc;
     }
 
-    updateAcceleration(mousePos: vec3, dir: boolean) {
+    updateAcceleration(mousePos: vec3, dir: boolean, dragScale: number) {
         if(mousePos != null) {
             var accDir = vec3.create();
             //attract
@@ -23,15 +23,15 @@ class Particle {
 
                 
 
-                //if too close to target, acceleration will be too large (denominator too small), so clamp
-                if(length < 10.0) {
-                    length = 500.0;
-                }
+                // //if too close to target, acceleration will be too large (denominator too small), so clamp
+                // if(length < 5.0) {
+                //     length = 500.0;
+                // }
 
-                //if too far from target, acceleration will be too small (denominator too large), so clamp
-                if(length > 70.0) {
-                    length = 10.0;
-                }
+                // //if too far from target, acceleration will be too small (denominator too large), so clamp
+                // if(length > 50.0) {
+                //     length = 40.0;
+                // }
             }
             //repel
             else {
@@ -56,7 +56,44 @@ class Particle {
 
             //drag force
             var drag = vec3.create();
-            drag = vec3.scale(drag, this.v, -.2);
+            drag = vec3.scale(drag, this.v, -dragScale);
+
+            accDir = vec3.add(accDir, accDir, drag);
+            this.a = accDir;
+        }
+
+    }
+
+    updateAccelerationToMesh(mousePos: vec3, dir: boolean, dragScale: number) {
+        if(mousePos != null) {
+            var accDir = vec3.create();
+            //attract
+            if(dir) {
+                accDir = vec3.subtract(accDir, mousePos, this.curr_p);
+                var length = Math.abs(vec3.length(accDir));
+
+                
+
+                //if too close to target, acceleration will be too large (denominator too small), so clamp
+                if(length < 1.0) {
+                    length = 500000.0;
+                }
+
+                // //if too far from target, acceleration will be too small (denominator too large), so clamp
+                // if(length > 50.0) {
+                //     length = 40.0;
+                // }
+            }
+            
+
+            var accMag = (9.8 * 20) / (10.0 + length*length);
+            
+            accDir = vec3.normalize(accDir, accDir);
+            accDir = vec3.scale(accDir, accDir, accMag);
+
+            //drag force
+            var drag = vec3.create();
+            drag = vec3.scale(drag, this.v, -dragScale*2);
 
             accDir = vec3.add(accDir, accDir, drag);
             this.a = accDir;
