@@ -3414,22 +3414,45 @@ let colorsArray;
 let n = 0;
 let currMouse;
 let currDir = true;
-let clicked = true;
-let cow;
-let wahoo;
+let clicked = false;
 let cube;
+let triangle;
+let dodec;
 function loadScene() {
+    clicked = false;
     square = new __WEBPACK_IMPORTED_MODULE_3__geometry_Square__["a" /* default */]();
     square.create();
     particles = new Array();
     offsetsArray = new Array();
     colorsArray = new Array();
-    currMouse = null;
+    currMouse = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["e" /* vec4 */].fromValues(0, 0, 0, 1);
     const canvas = document.getElementById('canvas');
     var gl = canvas.getContext('webgl2');
-    var objStr = document.getElementById('cube.obj').innerHTML;
-    cube = new __WEBPACK_IMPORTED_MODULE_9__geometry_Mesh__["a" /* default */](objStr, __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].fromValues(0, 0, 0));
+    var triStr = document.getElementById('triangle.obj').innerHTML;
+    triangle = new __WEBPACK_IMPORTED_MODULE_9__geometry_Mesh__["a" /* default */](triStr, __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].fromValues(0, 0, 0));
+    triangle.create();
+    var cubeStr = document.getElementById('cube.obj').innerHTML;
+    cube = new __WEBPACK_IMPORTED_MODULE_9__geometry_Mesh__["a" /* default */](cubeStr, __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].fromValues(0, 0, 0));
     cube.create();
+    var dodecStr = document.getElementById('dodecahedron.obj').innerHTML;
+    dodec = new __WEBPACK_IMPORTED_MODULE_9__geometry_Mesh__["a" /* default */](dodecStr, __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].fromValues(0, 0, 0));
+    dodec.create();
+    var scaleMat = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["b" /* mat4 */].create();
+    scaleMat = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["b" /* mat4 */].fromScaling(scaleMat, __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].fromValues(10, 10, 10));
+    for (var i = 0; i < triangle.positions.length; i += 4) {
+        var currPos = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["e" /* vec4 */].fromValues(triangle.positions[i], triangle.positions[i + 1], triangle.positions[i + 2], triangle.positions[i + 3]);
+        currPos = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["e" /* vec4 */].transformMat4(currPos, currPos, scaleMat);
+        triangle.positions[i] = currPos[0];
+        triangle.positions[i + 1] = currPos[1];
+        triangle.positions[i + 2] = currPos[2];
+    }
+    for (var i = 0; i < dodec.positions.length; i += 4) {
+        var currPos = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["e" /* vec4 */].fromValues(dodec.positions[i], dodec.positions[i + 1], dodec.positions[i + 2], dodec.positions[i + 3]);
+        currPos = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["e" /* vec4 */].transformMat4(currPos, currPos, scaleMat);
+        dodec.positions[i] = currPos[0];
+        dodec.positions[i + 1] = currPos[1];
+        dodec.positions[i + 2] = currPos[2];
+    }
     n = controls.numParticles;
     for (let i = 0; i < n; i++) {
         for (let j = 0; j < n; j++) {
@@ -3452,12 +3475,11 @@ function loadScene() {
     let colors = new Float32Array(colorsArray);
     square.setInstanceVBOs(offsets, colors);
     square.setNumInstances(n * n); // 10x10 grid of "particles"
-    console.log(square);
 }
 function raycast(camera, screenPos) {
     var eye = camera.position;
     var fov = camera.fovy;
-    var ref = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].fromValues(0.0, 0.0, 0.0);
+    var ref = camera.target;
     var sx = (screenPos[0]);
     var sy = (screenPos[1]);
     var alpha = fov / 2.0 * (Math.PI / 180);
@@ -3500,9 +3522,9 @@ function main() {
     const gui = new __WEBPACK_IMPORTED_MODULE_2_dat_gui__["GUI"]();
     gui.add(controls, 'numParticles', 0, 30).step(2);
     var forceDir = gui.add(controls, 'forceDirection', ['attract', 'repel']);
-    gui.add(controls, 'Reset');
     gui.add(controls, 'dragScale', 0, 1).step(.1);
-    gui.add(controls, 'meshAttractor', ['None', 'Cube', 'Cow', 'Wahoo']);
+    gui.add(controls, 'meshAttractor', ['None', 'Triangle', 'Cube', 'Dodecahedron']);
+    gui.add(controls, 'Reset');
     // get canvas and webgl context
     const canvas = document.getElementById('canvas');
     const gl = canvas.getContext('webgl2');
@@ -3526,24 +3548,101 @@ function main() {
     // This function will be called every frame
     function tick() {
         camera.update();
-        for (var i = 0; i < particles.length; i++) {
-            if (currMouse != null) {
-                if (controls.meshAttractor == 'None') {
+        renderer.setClearColor(.02, (Math.sin(time * .01) + 1) / 10.0, (Math.cos(time * .01) + 1) / 4.0, 1);
+        if (controls.meshAttractor == 'None') {
+            if (clicked) {
+                for (var i = 0; i < particles.length; i++) {
                     particles[i].updateAcceleration(__WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].fromValues(currMouse[0], currMouse[1], currMouse[2]), currDir, controls.dragScale);
-                }
-                else if (controls.meshAttractor == 'Cube') {
-                    particles[i].updateAcceleration(__WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].fromValues(cube.positions[i], cube.positions[i + 1], cube.positions[i + 2]), currDir, controls.dragScale);
+                    particles[i].curr_p = particles[i].updatePosition(.1);
+                    //update vbo array
+                    offsetsArray[3 * i] = particles[i].curr_p[0];
+                    offsetsArray[3 * i + 1] = particles[i].curr_p[1];
+                    offsetsArray[3 * i + 2] = particles[i].curr_p[2];
                 }
             }
-            particles[i].curr_p = particles[i].updatePosition(.1);
-            //update vbo array
-            offsetsArray[3 * i] = particles[i].curr_p[0];
-            offsetsArray[3 * i + 1] = particles[i].curr_p[1];
-            offsetsArray[3 * i + 2] = particles[i].curr_p[2];
             let offsets = new Float32Array(offsetsArray);
             let colors = new Float32Array(colorsArray);
             square.setInstanceVBOs(offsets, colors);
             square.setNumInstances(n * n);
+        }
+        else if (controls.meshAttractor == 'Triangle') {
+            //for each vertex in mesh
+            var currParticleIndex = 0; //needs to be 8 for cube
+            while (currParticleIndex < particles.length) {
+                for (var i = 0; i < triangle.positions.length; i += 4) {
+                    if (currParticleIndex >= particles.length) {
+                        break;
+                    }
+                    //calculate acceleration for curr particle to accelerate towards curr vertex
+                    particles[currParticleIndex].updateAcceleration(__WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].fromValues(triangle.positions[i], triangle.positions[i + 1], triangle.positions[i + 2]), true, controls.dragScale);
+                    currParticleIndex++;
+                }
+            }
+            for (var i = 0; i < particles.length; i++) {
+                particles[i].curr_p = particles[i].updatePosition(.1);
+                //update vbo array
+                offsetsArray[3 * i] = particles[i].curr_p[0];
+                offsetsArray[3 * i + 1] = particles[i].curr_p[1];
+                offsetsArray[3 * i + 2] = particles[i].curr_p[2];
+            }
+            let offsets = new Float32Array(offsetsArray);
+            let colors = new Float32Array(colorsArray);
+            square.setInstanceVBOs(offsets, colors);
+            square.setNumInstances(n * n);
+            clicked = true;
+        }
+        else if (controls.meshAttractor == 'Cube') {
+            //for each vertex in mesh
+            var currParticleIndex = 0; //needs to be 8 for cube
+            while (currParticleIndex < particles.length) {
+                for (var i = 0; i < cube.positions.length; i += 4) {
+                    if (currParticleIndex >= particles.length) {
+                        break;
+                    }
+                    //calculate acceleration for curr particle to accelerate towards curr vertex
+                    particles[currParticleIndex].updateAcceleration(__WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].fromValues(cube.positions[i], cube.positions[i + 1], cube.positions[i + 2]), true, controls.dragScale);
+                    currParticleIndex++;
+                }
+            }
+            for (var i = 0; i < particles.length; i++) {
+                particles[i].curr_p = particles[i].updatePosition(.1);
+                //update vbo array
+                offsetsArray[3 * i] = particles[i].curr_p[0];
+                offsetsArray[3 * i + 1] = particles[i].curr_p[1];
+                offsetsArray[3 * i + 2] = particles[i].curr_p[2];
+            }
+            let offsets = new Float32Array(offsetsArray);
+            let colors = new Float32Array(colorsArray);
+            square.setInstanceVBOs(offsets, colors);
+            square.setNumInstances(n * n);
+            clicked = true;
+        }
+        else if (controls.meshAttractor == 'Dodecahedron') {
+            //for each vertex in mesh
+            var currParticleIndex = 0; //needs to be 8 for cube
+            while (currParticleIndex < particles.length) {
+                for (var i = 0; i < dodec.positions.length; i += 4) {
+                    //console.log(currParticleIndex);
+                    if (currParticleIndex >= particles.length) {
+                        break;
+                    }
+                    //calculate acceleration for curr particle to accelerate towards curr vertex
+                    particles[currParticleIndex].updateAcceleration(__WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].fromValues(dodec.positions[i], dodec.positions[i + 1], dodec.positions[i + 2]), true, controls.dragScale);
+                    currParticleIndex++;
+                }
+            }
+            for (var i = 0; i < particles.length; i++) {
+                particles[i].curr_p = particles[i].updatePosition(.1);
+                //update vbo array
+                offsetsArray[3 * i] = particles[i].curr_p[0];
+                offsetsArray[3 * i + 1] = particles[i].curr_p[1];
+                offsetsArray[3 * i + 2] = particles[i].curr_p[2];
+            }
+            let offsets = new Float32Array(offsetsArray);
+            let colors = new Float32Array(colorsArray);
+            square.setInstanceVBOs(offsets, colors);
+            square.setNumInstances(n * n);
+            clicked = true;
         }
         stats.begin();
         lambert.setTime(time++);
@@ -3571,12 +3670,10 @@ function main() {
             var mouse2 = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["c" /* vec2 */].fromValues(event.x, event.y); //pixel space
             mouse2[0] = mouse2[0] * 2.0 / window.innerWidth - 1.0; //pixel to NDC (screen)
             mouse2[1] = 1.0 - (mouse2[1] * 2.0 / window.innerHeight);
-            console.log(mouse2[0]);
-            console.log(mouse2[1]);
             //raycast 
             var dir = raycast(camera, mouse2);
             var origin = camera.position;
-            //check if this ray from eye intersects unit plane at origin]
+            //check if this ray from eye intersects unit plane at origin
             var planeNormal = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].create();
             planeNormal = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].normalize(planeNormal, camera.position);
             var denom = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].dot(planeNormal, dir);
@@ -3598,7 +3695,6 @@ function main() {
             else {
                 currDir = false;
             }
-            clicked = false;
         }
     });
     // Start the render loop
@@ -15412,7 +15508,6 @@ class ShaderProgram {
 
 class Particle {
     constructor(curr, v, acc) {
-        //this.old_p = curr; 
         this.curr_p = curr;
         this.v = v;
         this.a = acc;
@@ -15423,28 +15518,11 @@ class Particle {
             //attract
             if (dir) {
                 accDir = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].subtract(accDir, mousePos, this.curr_p);
-                var length = Math.abs(__WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].length(accDir));
-                // //if too close to target, acceleration will be too large (denominator too small), so clamp
-                // if(length < 5.0) {
-                //     length = 500.0;
-                // }
-                // //if too far from target, acceleration will be too small (denominator too large), so clamp
-                // if(length > 50.0) {
-                //     length = 40.0;
-                // }
             }
             else {
                 accDir = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].subtract(accDir, this.curr_p, mousePos);
-                var length = Math.abs(__WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].length(accDir));
-                //if too close to target, acceleration will be too large (denominator too small), so clamp
-                // if(length < 2.0) {
-                //     length = 20.0;
-                // }
-                // //if too far from target, acceleration will be too small (denominator too large), so clamp
-                // else if(length > 50.0) {
-                //     length = 5000.0;
-                // }
             }
+            var length = Math.abs(__WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].length(accDir));
             var accMag = (9.8 * 20) / (10.0 + length * length);
             accDir = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].normalize(accDir, accDir);
             accDir = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].scale(accDir, accDir, accMag);
@@ -15459,7 +15537,6 @@ class Particle {
     updatePosition(time) {
         var new_p = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].create();
         var new_v = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].create();
-        //var new_2p = vec3.create();
         var acc = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].create();
         new_p = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].scale(new_p, this.v, time);
         new_p = __WEBPACK_IMPORTED_MODULE_0_gl_matrix__["d" /* vec3 */].add(new_p, this.curr_p, new_p);
@@ -15556,7 +15633,7 @@ module.exports = "#version 300 es\n\nuniform mat4 u_ViewProj;\nuniform float u_T
 /* 71 */
 /***/ (function(module, exports) {
 
-module.exports = "#version 300 es\n\n#define M_PI 3.1415926535897932384626433832795\n\nprecision highp float;\n\n\nin vec4 fs_Col;\nin vec4 fs_Pos;\n\nuniform float u_Time;\n\nout vec4 out_Col;\n\nvoid main()\n{\n    float dist = 1.0 - (length(fs_Pos.xyz) * 2.0);\n    vec3 a = vec3(0.5, 0.3, 0.5);\n    vec3 b = vec3(0.5, 0.8, 0.5);\n    vec3 c = vec3(2.0, 1.0, 0.0);\n    vec3 d = vec3(0.5, 0.2, 0.25);\n\n   // vec3(0.5,0.3,0.5),vec3(0.5,0.8,0.5),vec3(2.0,1.0,0.0),vec3(0.5,0.20,0.25)\n\n    float r =  a.x + b.x * cos(2.0f * M_PI * (c.x * 2.0 * fs_Pos.x / (.4 * cos(u_Time * .01) + d.x)));\n    float g =  a.y + b.y * cos(2.0f * M_PI * (c.y * 3.0 * fs_Pos.y / (.8 * cos(u_Time * .01) + d.y)));\n    float b2 = a.z + b.z * cos(2.0f * M_PI * (c.z * 6.0 * fs_Pos.z / (.6 * cos(u_Time * .01) + d.z)));\n \n    out_Col = vec4(dist) * vec4(r, g, b2, 1.0);\n\n\n    //out_Col = vec4(dist) * fs_Col;\n}\n"
+module.exports = "#version 300 es\n\n#define M_PI 3.1415926535897932384626433832795\n\nprecision highp float;\n\n\nin vec4 fs_Col;\nin vec4 fs_Pos;\n\nuniform float u_Time;\n\nout vec4 out_Col;\n\nvoid main()\n{\n    float dist = 1.0 - (length(fs_Pos.xyz) * 2.0);\n    vec3 a = vec3(0.5, 0.3, 0.5);\n    vec3 b = vec3(0.5, 0.8, 0.5);\n    vec3 c = vec3(2.0, 1.0, 0.0);\n    vec3 d = vec3(0.5, 0.2, 0.25);\n\n  \n    float r =  a.x + b.x * cos(2.0f * M_PI * (c.x * 2.0 * fs_Pos.x / (.4 * cos(u_Time * .01) + d.x)));\n    float g =  a.y + b.y * cos(2.0f * M_PI * (c.y * 3.0 * fs_Pos.y / (.8 * cos(u_Time * .01) + d.y)));\n    float b2 = a.z + b.z * cos(2.0f * M_PI * (c.z * 6.0 * fs_Pos.z / (.6 * cos(u_Time * .01) + d.z)));\n \n    \n\n    out_Col = vec4(dist) * vec4(r, g, b2, 1.0);\n\n\n}\n"
 
 /***/ })
 /******/ ]);
